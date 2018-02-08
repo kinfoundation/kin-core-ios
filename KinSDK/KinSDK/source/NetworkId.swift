@@ -32,7 +32,7 @@ extension NetworkId {
     public var issuer: String {
         switch self {
         case .mainNet:
-            return ""
+            return "GAQ4HYZJ5PSYBMHXAX75DKN4YGHFIEGZYBDTGFV7ZHYGQWVGFHOW75CB"
         case .testNet:
             return "GCKG5WGBIJP74UDNRIRDFGENNIH5Y3KBI5IHREFAJKV4MQXLELT7EX6V"
         case .custom (let issuer, _):
@@ -43,7 +43,7 @@ extension NetworkId {
     public var stellarNetworkId: String {
         switch self {
         case .mainNet:
-            return ""
+            return "Public Global Stellar Network ; September 2015"
         case .testNet:
             return "Test SDF Network ; September 2015"
         case .custom(_, let stellarNetworkId):
