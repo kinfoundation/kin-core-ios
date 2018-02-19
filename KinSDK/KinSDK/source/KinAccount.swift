@@ -39,11 +39,11 @@ public protocol KinAccount {
      - parameter recipient: The recipient's public address
      - parameter kin: The amount of Kin to be sent
      - parameter passphrase: The passphrase used to generate the `KinAccount`
-     - parameter memo: An optional string, up-to 28 characters, included on the transaction record.
+     - parameter memo: An optional data buffer, up-to 32 bytes, included on the transaction record.
      */
     func sendTransaction(to recipient: String,
                          kin: Decimal,
-                         memo: String?,
+                         memo: Data?,
                          passphrase: String,
                          completion: @escaping TransactionCompletion)
     
@@ -58,7 +58,7 @@ public protocol KinAccount {
      - parameter recipient: The recipient's public address
      - parameter kin: The amount of Kin to be sent
      - parameter passphrase: The passphrase used to generate the `KinAccount`
-     - parameter memo: An optional string, up-to 28 characters, included on the transaction record.
+     - parameter memo: An optional data buffer, up-to 32 bytes, included on the transaction record.
 
      - throws: An `Error` if the transaction fails to be generated or submitted
      
@@ -66,7 +66,7 @@ public protocol KinAccount {
      */
     func sendTransaction(to recipient: String,
                          kin: Decimal,
-                         memo: String?,
+                         memo: Data?,
                          passphrase: String) throws -> TransactionId
     
     /**
@@ -90,30 +90,7 @@ public protocol KinAccount {
      */
     func balance() throws -> Balance
 
-    func watch(closure: @escaping (Transaction) -> Void) throws
-
-    func cancelWatch()
-
-    /**
-     **Deprecated**: this method returns the result of `balance(completion:)`.
-     
-     - parameter completion: A callback block to be invoked once the pending balance is fetched, or
-     fails to be fetched.
-     */
-    @available(*, deprecated)
-    func pendingBalance(completion: @escaping BalanceCompletion)
-    
-    /**
-     **Deprecated**: this method returns the result of `balance()`.
-     
-     **Do not** call this from the main thread.
-     
-     - throws: An `Error` if balance cannot be fetched.
-     
-     - returns: The pending balance of the account.
-     */
-    @available(*, deprecated)
-    func pendingBalance() throws -> Balance
+    func watch() throws -> PaymentWatch
     
     /**
      Exports this account as a Key Store JSON string, to be backed up by the user.
@@ -177,7 +154,7 @@ final class KinStellarAccount: KinAccount {
     
     func sendTransaction(to recipient: String,
                          kin: Decimal,
-                         memo: String? = nil,
+                         memo: Data? = nil,
                          passphrase: String,
                          completion: @escaping TransactionCompletion) {
         guard let stellar = stellar else {
@@ -204,25 +181,35 @@ final class KinStellarAccount: KinAccount {
             return try self.stellarAccount.sign(message: message, passphrase: passphrase)
         }
 
-        stellar.payment(source: stellarAccount,
-                        destination: recipient,
-                        amount: intKin,
-                        memo: memo)
-            .then { txHash -> Void in
-                self.stellarAccount.sign = nil
-
-                completion(txHash, nil)
+        do {
+            var m = Memo.MEMO_NONE
+            if let memo = memo {
+                m = try Memo(memo)
             }
-            .error { error in
-                self.stellarAccount.sign = nil
 
-                completion(nil, KinError.paymentFailed(error))
+            stellar.payment(source: stellarAccount,
+                            destination: recipient,
+                            amount: intKin,
+                            memo: m)
+                .then { txHash -> Void in
+                    self.stellarAccount.sign = nil
+
+                    completion(txHash, nil)
+                }
+                .error { error in
+                    self.stellarAccount.sign = nil
+
+                    completion(nil, KinError.paymentFailed(error))
+            }
+        }
+        catch {
+            completion(nil, error)
         }
     }
     
     func sendTransaction(to recipient: String,
                          kin: Decimal,
-                         memo: String? = nil,
+                         memo: Data? = nil,
                          passphrase: String) throws -> TransactionId {
         let dispatchGroup = DispatchGroup()
         dispatchGroup.enter()
@@ -299,7 +286,7 @@ final class KinStellarAccount: KinAccount {
         return balance
     }
 
-    public func watch(closure: @escaping (Transaction) -> Void) throws {
+    public func watch() throws -> PaymentWatch {
         guard let stellar = stellar else {
             throw KinError.internalInconsistency
         }
@@ -308,23 +295,9 @@ final class KinStellarAccount: KinAccount {
             throw KinError.accountDeleted
         }
 
-        stellar.watch(account: stellarAccount.publicKey!, closure: closure)
+        return PaymentWatch(stellar: stellar, account: stellarAccount.publicKey!)
     }
 
-    public func cancelWatch() {
-        stellar?.cancelWatch()
-    }
-
-    @available(*, deprecated)
-    func pendingBalance(completion: @escaping BalanceCompletion) {
-        balance(completion: completion)
-    }
-    
-    @available(*, deprecated)
-    func pendingBalance() throws -> Balance {
-        return try balance()
-    }
-    
     @available(*, unavailable)
     private func exportKeyStore(passphrase: String, exportPassphrase: String) throws -> String? {
         let accountData = KeyStore.exportAccount(account: stellarAccount, passphrase: passphrase, newPassphrase: exportPassphrase)

@@ -13,6 +13,7 @@ import StellarKit
 class KinSampleViewController: UITableViewController {
     private var kinClient: KinClient!
     private var kinAccount: KinAccount!
+    private var watch: PaymentWatch?
 
     class func instantiate(with kinClient: KinClient, kinAccount: KinAccount) -> KinSampleViewController {
         guard let viewController = UIStoryboard(name: "Main", bundle: nil).instantiateViewController(withIdentifier: "KinSampleViewController") as? KinSampleViewController else {
@@ -34,13 +35,16 @@ class KinSampleViewController: UITableViewController {
 
         tableView.tableFooterView = UIView()
 
-        try? kinAccount.watch { [weak self] tx in
+        watch = try? kinAccount.watch()
+        watch?.onMessage = { [weak self] paymentInfo in
             guard let me = self else {
                 return
             }
 
-            if let balanceCell = me.tableView.visibleCells.flatMap({ $0 as? BalanceTableViewCell }).first {
-                balanceCell.refreshBalance(me)
+            DispatchQueue.main.async {
+                if let balanceCell = me.tableView.visibleCells.flatMap({ $0 as? BalanceTableViewCell }).first {
+                    balanceCell.refreshBalance(me)
+                }
             }
         }
     }
@@ -79,12 +83,23 @@ extension KinSampleViewController: KinClientCellDelegate {
         navigationController?.pushViewController(txViewController, animated: true)
     }
 
+    func recentTransactionsTapped() {
+        guard let txViewController = storyboard?.instantiateViewController(withIdentifier: "RecentTxsTableViewController") as? RecentTxsTableViewController else {
+            return
+        }
+
+        txViewController.kinAccount = kinAccount
+        txViewController.view.tintColor = view.tintColor
+        navigationController?.pushViewController(txViewController, animated: true)
+    }
+
     func deleteAccountTapped() {
         let alertController = UIAlertController(title: "Delete Wallet?",
                                                 message: "Deleting a wallet will cause funds to be lost",
                                                 preferredStyle: .actionSheet)
         let deleteAction = UIAlertAction(title: "OK", style: .destructive) { _ in
             try? self.kinClient.deleteAccount(at: 0, with: KinAccountPassphrase)
+            self.watch = nil
             self.navigationController?.popViewController(animated: true)
         }
         let cancelAction = UIAlertAction(title: "Cancel", style: .cancel, handler: nil)
