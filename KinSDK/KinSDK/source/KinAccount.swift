@@ -240,7 +240,7 @@ final class KinStellarAccount: KinAccount {
             return try self.stellarAccount.sign(message: message, passphrase: "")
         }
         
-        let prefixedMemo = Memo.prependAppIdPrefix(appId, to: memo ?? "")
+        let prefixedMemo = Memo.prependIfNeeded(appId: appId, to: memo ?? "")
         
         guard prefixedMemo.utf8.count <= StellarKit.Transaction.MaxMemoLength else {
             completion(nil, StellarError.memoTooLong(prefixedMemo))
