@@ -125,7 +125,7 @@ extension AppId {
 }
 
 extension Memo {
-    public static func prependAppIdPrefix(_ appId: AppId, to memo: String) -> String {
+    public static func prependAppIdPrefixIfNeeded(_ appId: AppId, to memo: String) -> String {
         if let regex = try? NSRegularExpression(pattern: "^1-[A-z0-9]{3,4}-.*") {
             let range = NSRange(location: 0, length: memo.count)
             
