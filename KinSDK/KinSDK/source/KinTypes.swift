@@ -126,7 +126,7 @@ extension AppId {
 
 extension Memo {
     public static func prependAppIdIfNeeded(_ appId: AppId, to memo: String) -> String {
-        if let regex = try? NSRegularExpression(pattern: "^1-[A-z0-9]{3,4}-.*") {
+        if let regex = try? NSRegularExpression(pattern: "^1-[A-z0-9]{4}-.*") {
             let range = NSRange(location: 0, length: memo.count)
             
             if regex.firstMatch(in: memo, options: [], range: range) != nil {
