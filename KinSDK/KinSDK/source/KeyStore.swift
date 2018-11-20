@@ -259,7 +259,7 @@ extension KeyStore {
 }
 
 private struct KeychainStorage: AccountStorage {
-    private static let keychainPrefix = "__swifty_stellar_"
+    private static let keychainPrefix = "KinSDK_"
     private static let keychain = KeychainSwift(keyPrefix: keychainPrefix)
 
     static func nextStorageKey() -> String {
@@ -344,7 +344,7 @@ private struct KeychainStorage: AccountStorage {
 // MARK: Migration
 
 extension KeyStore {
-    public static func migrateIfNeeded() {
+    internal static func migrateIfNeeded() {
         KeychainStorage.migrate()
     }
 }
@@ -357,11 +357,16 @@ extension KeychainStorage {
      In order to update the access type, the existing keys need to simply be resaved.
      */
     fileprivate static func migrate() {
-        let keys = self.keys().compactMap { removePrefix($0) }
+        let oldKeychainPrefix = "__swifty_stellar_"
+        let oldKeychain = KeychainSwift(keyPrefix: oldKeychainPrefix)
+        let keys = (oldKeychain.getAllKeys() ?? [])
+            .filter({ $0.starts(with: oldKeychainPrefix) })
+            .sorted()
+            .compactMap({ String($0.split(separator: "_").last ?? "") })
 
         for key in keys {
-            if let data = retrieve(key) {
-                _ = delete(key)
+            if let data = oldKeychain.getData(key) {
+                oldKeychain.delete(key)
                 _ = save(data, forKey: key)
             }
         }
